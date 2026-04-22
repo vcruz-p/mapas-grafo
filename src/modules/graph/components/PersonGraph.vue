@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue';
 import * as d3 from 'd3';
-import type { Person, RelationLink } from '../data/mockData';
+import type { Person, RelationLink } from '../../../data/mockData';
 
 interface SimNode extends d3.SimulationNodeDatum {
   id: string;
