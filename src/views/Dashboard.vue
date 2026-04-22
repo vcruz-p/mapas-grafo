@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-
-// IMPORT CORRECTO (asegúrate que ambos exporten default Vue component)
-import GraphModule from '../modules/graph/index'
-import MapModule from '../modules/map/index'
+import PersonGraph from '../modules/graph/components/PersonGraph.vue'
+import MapView from '../modules/map/components/MapView.vue'
+import { persons, links } from '../data/mockData'
 
 const activeTab = ref<'graph' | 'map'>('graph')
 </script>
@@ -28,7 +27,12 @@ const activeTab = ref<'graph' | 'map'>('graph')
     </header>
 
     <main class="main">
-      <component :is="activeTab === 'graph' ? GraphModule : MapModule" />
+      <PersonGraph 
+        v-if="activeTab === 'graph'" 
+        :persons="persons" 
+        :links="links" 
+      />
+      <MapView v-else />
     </main>
 
   </div>
