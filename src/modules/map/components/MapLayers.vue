@@ -102,10 +102,7 @@ watch(() => props.map, (newMap) => {
 
 <style scoped>
 .layer-control {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 1000;
+  /* No absolute positioning - flows in flex container */
 }
 
 .layer-toggle {
@@ -143,6 +140,7 @@ watch(() => props.map, (newMap) => {
   min-width: 180px;
   overflow: hidden;
   border: 1px solid #e2e8f0;
+  z-index: 2001;
 }
 
 .layer-header {
