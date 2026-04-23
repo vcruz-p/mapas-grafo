@@ -12,6 +12,7 @@ import { useMap } from '../composables/useMap'
 import { getRoute } from '../services/map.service'
 
 import MapControls from './MapControls.vue'
+import MapLayers from './MapLayers.vue'
 
 // =====================
 // LEAFLET ICON FIX
@@ -258,6 +259,11 @@ watch(() => props.address, load)
       @reset="resetView"
       @clear-route="clearRoute"
     />
+
+    <!-- ===================== -->
+    <!-- CAPAS (ARRIBA DERECHA) -->
+    <!-- ===================== -->
+    <MapLayers :map="map" @layer-change="console.log('Capa cambiada:', $event)" />
 
     <!-- LOADING -->
     <div v-if="status === 'loading'" class="overlay">
