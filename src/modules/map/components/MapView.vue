@@ -13,6 +13,7 @@ import { getRoute } from '../services/map.service'
 
 import MapControls from './MapControls.vue'
 import MapLayers from './MapLayers.vue'
+import MapSearch from './MapSearch.vue'
 
 // =====================
 // LEAFLET ICON FIX
@@ -59,10 +60,6 @@ const mapRef = ref<HTMLDivElement | null>(null)
 const status = ref<'idle' | 'loading' | 'ok' | 'error'>('idle')
 
 const routingEnabled = ref(true)
-
-// SEARCH UI
-const searchOpen = ref(false)
-const searchValue = ref('')
 
 // =====================
 // LEAFLET STATE
@@ -186,29 +183,10 @@ async function load() {
 }
 
 // =====================
-// SEARCH (lat,lng o address)
+// HANDLE SELECT FROM MAPSEARCH
 // =====================
-async function handleSearch() {
-  const value = searchValue.value.trim()
-  if (!value) return
-
-  try {
-    if (value.includes(',')) {
-      const [lat, lng] = value.split(',').map(v => Number(v.trim()))
-      if (!isNaN(lat) && !isNaN(lng)) {
-        moveTo({ lat, lng })
-        searchOpen.value = false
-        return
-      }
-    }
-
-    const coords = await resolveAddress(value)
-    moveTo(coords)
-    searchOpen.value = false
-
-  } catch {
-    console.error('Search error')
-  }
+function handleSelect(coords: { lat: number; lng: number; label: string }) {
+  moveTo(coords)
 }
 
 // =====================
@@ -233,26 +211,12 @@ watch(() => props.address, load)
   <div class="map-wrapper">
 
     <!-- ===================== -->
-    <!-- SEARCH (ARRIBA DERECHA, ENCIMA DE LAYERS) -->
+    <!-- SEARCH (TOP RIGHT, ABOVE LAYERS) -->
     <!-- ===================== -->
-    <div class="search-container">
-      <div class="search-box">
-        <button class="search-btn" @click="searchOpen = !searchOpen">
-          🔍
-        </button>
-
-        <transition name="slide-fade">
-          <div v-if="searchOpen" class="search-panel">
-            <input
-              v-model="searchValue"
-              placeholder="Dirección o lat,lng"
-              @keyup.enter="handleSearch"
-            />
-            <button @click="handleSearch">Ir</button>
-          </div>
-        </transition>
-      </div>
-    </div>
+    <MapSearch 
+      @select="handleSelect"
+      class="search-component"
+    />
 
     <!-- ===================== -->
     <!-- CAPAS (ARRIBA DERECHA) -->
@@ -382,7 +346,7 @@ watch(() => props.address, load)
 /* ===================== */
 .layers-container {
   position: absolute;
-  top: 70px;
+  top: 80px;
   right: 12px;
   z-index: 2000;
 }
@@ -392,7 +356,7 @@ watch(() => props.address, load)
 /* ===================== */
 .controls-container {
   position: absolute;
-  top: 130px;
+  top: 140px;
   right: 12px;
   z-index: 2000;
 }
