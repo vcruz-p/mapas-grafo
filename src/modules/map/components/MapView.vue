@@ -235,35 +235,43 @@ watch(() => props.address, load)
     <!-- ===================== -->
     <!-- SEARCH (ARRIBA IZQUIERDA) -->
     <!-- ===================== -->
-    <div class="search-box">
-      <button class="search-btn" @click="searchOpen = !searchOpen">
-        🔍
-      </button>
+    <div class="search-container">
+      <div class="search-box">
+        <button class="search-btn" @click="searchOpen = !searchOpen">
+          🔍
+        </button>
 
-      <div v-if="searchOpen" class="search-panel">
-        <input
-          v-model="searchValue"
-          placeholder="Dirección o lat,lng"
-          @keyup.enter="handleSearch"
-        />
-        <button @click="handleSearch">Ir</button>
+        <transition name="slide-fade">
+          <div v-if="searchOpen" class="search-panel">
+            <input
+              v-model="searchValue"
+              placeholder="Dirección o lat,lng"
+              @keyup.enter="handleSearch"
+            />
+            <button @click="handleSearch">Ir</button>
+          </div>
+        </transition>
       </div>
     </div>
 
     <!-- ===================== -->
-    <!-- CONTROLES (ABAJO DERECHA) -->
-    <!-- ===================== -->
-    <MapControls
-      v-model:routingEnabled="routingEnabled"
-      @center="centerMarker"
-      @reset="resetView"
-      @clear-route="clearRoute"
-    />
-
-    <!-- ===================== -->
     <!-- CAPAS (ARRIBA DERECHA) -->
     <!-- ===================== -->
-    <MapLayers :map="map" @layer-change="console.log('Capa cambiada:', $event)" />
+    <div class="layers-container">
+      <MapLayers :map="map" @layer-change="console.log('Capa cambiada:', $event)" />
+    </div>
+
+    <!-- ===================== -->
+    <!-- CONTROLES (DERECHA, DEBAJO DE CAPAS) -->
+    <!-- ===================== -->
+    <div class="controls-container">
+      <MapControls
+        v-model:routingEnabled="routingEnabled"
+        @center="centerMarker"
+        @reset="resetView"
+        @clear-route="clearRoute"
+      />
+    </div>
 
     <!-- LOADING -->
     <div v-if="status === 'loading'" class="overlay">
@@ -291,11 +299,14 @@ watch(() => props.address, load)
 /* ===================== */
 /* SEARCH (TOP LEFT) */
 /* ===================== */
-.search-box {
+.search-container {
   position: absolute;
   top: 12px;
   left: 12px;
   z-index: 2000;
+}
+
+.search-box {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -309,27 +320,81 @@ watch(() => props.address, load)
   background: white;
   cursor: pointer;
   box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  transition: all 0.2s ease;
+}
+
+.search-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.25);
 }
 
 .search-panel {
   display: flex;
   gap: 6px;
+  align-items: center;
 }
 
 .search-panel input {
   width: 220px;
-  padding: 6px;
+  padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid #d11c1c;
+  border: 2px solid #e5e7eb;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.search-panel input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
 .search-panel button {
   background: #3b82f6;
   color: white;
   border: none;
-  padding: 6px 10px;
+  padding: 10px 16px;
   border-radius: 8px;
   cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.search-panel button:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+/* Slide-fade transition for search panel */
+.slide-fade-enter-active,
+.slide-fade-leave-active {
+  transition: all 0.2s ease;
+}
+
+.slide-fade-enter-from,
+.slide-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+/* ===================== */
+/* LAYERS (TOP RIGHT) */
+/* ===================== */
+.layers-container {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2000;
+}
+
+/* ===================== */
+/* CONTROLS (RIGHT, BELOW LAYERS) */
+/* ===================== */
+.controls-container {
+  position: absolute;
+  top: 70px;
+  right: 12px;
+  z-index: 2000;
 }
 
 /* ===================== */
