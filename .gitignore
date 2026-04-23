@@ -1,57 +1,15 @@
 ```
-# Build artifacts
-tsconfig.app.tsbuildinfo
+# TypeScript/JavaScript build artifacts
+*.tsbuildinfo
 
 # Dependencies
 node_modules/
-.yarn/
 
-# Logs
-*.log
+# Editors
+.vscode/
 
-# Environment variables
+# Environment
 .env
 .env.local
 *.env.*
-
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Coverage reports
-coverage/
-htmlcov/
-*.coverage
-
-# Distribution and build folders
-dist/
-build/
-target/
-
-# Python cache
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-# Temporary files
-*.tmp
-*.temp
-
-# OS generated files
-.DS_Store
-Thumbs.db
-
-# Compression files
-*.zip
-*.gz
-*.tar
-*.tgz
-*.bz2
-*.xz
-*.7z
-*.rar
-*.zst
 ```
