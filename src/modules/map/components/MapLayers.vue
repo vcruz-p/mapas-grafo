@@ -14,8 +14,6 @@ const emit = defineEmits<{
 const baseLayers = ref([
   { name: 'Calles', id: 'streets', icon: '🗺️' },
   { name: 'Satélite', id: 'satellite', icon: '🛰️' },
-  { name: 'Terreno', id: 'terrain', icon: '🏔️' },
-  { name: 'Oscuro', id: 'dark', icon: '🌙' },
 ])
 
 const activeLayer = ref('streets')
@@ -25,8 +23,6 @@ const isOpen = ref(false)
 const tileLayers: Record<string, string> = {
   streets: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
   satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-  terrain: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
 }
 
 const attributions: Record<string, string> = {
