@@ -16,18 +16,23 @@ const emit = defineEmits<{
 <template>
   <div class="map-controls">
 
+    <button @click="emit('center')" class="control-btn" aria-label="Centrar marcador">
+      📍
+    </button>
+    <button @click="emit('reset')" class="control-btn" aria-label="Resetear vista">
+      ⟲
+    </button>
+    <button @click="emit('clear-route')" class="control-btn" aria-label="Limpiar ruta">
+      🧹
+    </button>
 
-    <button @click="emit('center')">📍</button>
-    <button @click="emit('reset')">⟲</button>
-    <button @click="emit('clear-route')">🧹</button>
-
-    <label class="toggle">
+    <label class="toggle-control" aria-label="Activar rutas">
       <input
         type="checkbox"
         :checked="routingEnabled"
         @change="emit('update:routingEnabled', ($event.target as HTMLInputElement).checked)"
       />
-      Rutas
+      <span class="toggle-text">Rutas</span>
     </label>
 
   </div>
@@ -37,10 +42,10 @@ const emit = defineEmits<{
 .map-controls {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
-.map-controls button {
+.control-btn {
   width: 42px;
   height: 42px;
   border: none;
@@ -55,25 +60,39 @@ const emit = defineEmits<{
   justify-content: center;
 }
 
-.map-controls button:hover {
+.control-btn:hover {
   background: #f1f5f9;
   transform: scale(1.05);
 }
 
-.toggle {
-  font-size: 13px;
-  background: white;
-  padding: 10px 12px;
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+.toggle-control {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  padding: 10px 12px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
   cursor: pointer;
   transition: all 0.2s ease;
+  min-height: 42px;
 }
 
-.toggle:hover {
+.toggle-control:hover {
   background: #f1f5f9;
+}
+
+.toggle-control input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #3b82f6;
+}
+
+.toggle-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1f2937;
 }
 </style>

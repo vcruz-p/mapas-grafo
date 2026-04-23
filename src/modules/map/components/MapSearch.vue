@@ -233,6 +233,7 @@ function handleBlur() {
 .map-search {
   width: min(360px, calc(100vw - 32px));
   font-family: var(--font-sans);
+  position: relative;
 }
 
 /* =====================
@@ -244,8 +245,8 @@ function handleBlur() {
   align-items: center;
   gap: 4px;
   padding: 6px;
-  background: var(--search-bg);
-  border: 2px solid var(--search-border);
+  background: #ffffff;
+  border: 2px solid #e5e7eb;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
@@ -369,8 +370,8 @@ function handleBlur() {
   top: calc(100% + 8px);
   left: 0;
   right: 0;
-  background: var(--search-bg);
-  border: 2px solid var(--search-border);
+  background: #ffffff;
+  border: 2px solid #e5e7eb;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
   max-height: 320px;
@@ -380,7 +381,7 @@ function handleBlur() {
   
   /* Scrollbar personalizado */
   scrollbar-width: thin;
-  scrollbar-color: var(--search-border) transparent;
+  scrollbar-color: #e5e7eb transparent;
 }
 
 .results-dropdown::-webkit-scrollbar {
@@ -516,8 +517,8 @@ function handleBlur() {
   align-items: center;
   gap: 8px;
   padding: 24px 16px;
-  background: var(--search-bg);
-  border: 2px solid var(--search-border);
+  background: #ffffff;
+  border: 2px solid #e5e7eb;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
   text-align: center;
