@@ -231,10 +231,6 @@ function handleBlur() {
    CONTENEDOR PRINCIPAL
    ===================== */
 .map-search {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 2001;
   width: min(360px, calc(100vw - 32px));
   font-family: var(--font-sans);
 }
