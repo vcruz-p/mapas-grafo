@@ -211,30 +211,31 @@ watch(() => props.address, load)
   <div class="map-wrapper">
 
     <!-- ===================== -->
-    <!-- SEARCH (TOP RIGHT, ABOVE LAYERS) -->
+    <!-- CONTROLS VERTICAL (RIGHT SIDE) -->
     <!-- ===================== -->
-    <MapSearch 
-      @select="handleSelect"
-      class="search-component"
-    />
-
-    <!-- ===================== -->
-    <!-- CAPAS (ARRIBA DERECHA) -->
-    <!-- ===================== -->
-    <div class="layers-container">
-      <MapLayers :map="map" @layer-change="console.log('Capa cambiada:', $event)" />
-    </div>
-
-    <!-- ===================== -->
-    <!-- CONTROLES (DERECHA, DEBAJO DE CAPAS) -->
-    <!-- ===================== -->
-    <div class="controls-container">
-      <MapControls
-        v-model:routingEnabled="routingEnabled"
-        @center="centerMarker"
-        @reset="resetView"
-        @clear-route="clearRoute"
+    <div class="controls-vertical">
+      
+      <!-- SEARCH (TOP) -->
+      <MapSearch 
+        @select="handleSelect"
+        class="search-component"
       />
+
+      <!-- LAYERS (BELOW SEARCH) -->
+      <div class="layers-container">
+        <MapLayers :map="map" @layer-change="console.log('Capa cambiada:', $event)" />
+      </div>
+
+      <!-- CONTROLS (BELOW LAYERS) -->
+      <div class="controls-container">
+        <MapControls
+          v-model:routingEnabled="routingEnabled"
+          @center="centerMarker"
+          @reset="resetView"
+          @clear-route="clearRoute"
+        />
+      </div>
+
     </div>
 
     <!-- LOADING -->
@@ -261,104 +262,31 @@ watch(() => props.address, load)
 }
 
 /* ===================== */
-/* SEARCH (TOP RIGHT, ABOVE LAYERS) */
+/* CONTROLS VERTICAL (RIGHT SIDE) */
 /* ===================== */
-.search-container {
+.controls-vertical {
   position: absolute;
   top: 12px;
   right: 12px;
-  z-index: 2001;
-}
-
-.search-box {
+  z-index: 2000;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
-.search-btn {
-  width: 42px;
-  height: 42px;
-  border: none;
-  border-radius: 10px;
-  background: white;
-  cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-  transition: all 0.2s ease;
+/* SEARCH COMPONENT */
+.search-component {
+  /* Search has its own internal positioning */
 }
 
-.search-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.25);
-}
-
-.search-panel {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.search-panel input {
-  width: 220px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 2px solid #e5e7eb;
-  font-size: 14px;
-  outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.search-panel input:focus {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
-}
-
-.search-panel button {
-  background: #3b82f6;
-  color: white;
-  border: none;
-  padding: 10px 16px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.search-panel button:hover {
-  background: #2563eb;
-  transform: translateY(-1px);
-}
-
-/* Slide-fade transition for search panel */
-.slide-fade-enter-active,
-.slide-fade-leave-active {
-  transition: all 0.2s ease;
-}
-
-.slide-fade-enter-from,
-.slide-fade-leave-to {
-  opacity: 0;
-  transform: translateY(-8px);
-}
-
-/* ===================== */
-/* LAYERS (TOP RIGHT, BELOW SEARCH) */
-/* ===================== */
+/* LAYERS */
 .layers-container {
-  position: absolute;
-  top: 80px;
-  right: 12px;
-  z-index: 2000;
+  /* No absolute positioning - flows in flex container */
 }
 
-/* ===================== */
-/* CONTROLS (RIGHT, BELOW LAYERS) */
-/* ===================== */
+/* CONTROLS */
 .controls-container {
-  position: absolute;
-  top: 140px;
-  right: 12px;
-  z-index: 2000;
+  /* No absolute positioning - flows in flex container */
 }
 
 /* ===================== */
