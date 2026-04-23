@@ -3,11 +3,19 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
-// Fix iconos
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
 import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 
+import type { Coordinates } from '../types/map.types'
+import { useMap } from '../composables/useMap'
+import { getRoute } from '../services/map.service'
+
+import MapControls from './MapControls.vue'
+
+// =====================
+// LEAFLET ICON FIX
+// =====================
 delete (L.Icon.Default.prototype as any)._getIconUrl
 L.Icon.Default.mergeOptions({
   iconUrl: markerIcon,
@@ -15,15 +23,19 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 })
 
-// 🔥 CONFIG CENTRAL
-const API = 'http://192.168.83.128:3000'
-const TILE = 'http://192.168.83.128:8080/styles/basic/{z}/{x}/{y}.png'
+// =====================
+// TILE SERVER
+// =====================
+const TILE =
+  import.meta.env.VITE_TILE_URL ||
+  'http://192.168.83.128:8081/tile/{z}/{x}/{y}.png'
 
-interface Coordinates {
-  lat: number
-  lng: number
+const DEFAULT_COORDS: Coordinates = {
+  lat: 23.1136,
+  lng: -82.3666,
 }
 
+// =====================
 const props = withDefaults(
   defineProps<{
     coordinates?: Coordinates
@@ -31,57 +43,90 @@ const props = withDefaults(
     zoom?: number
     label?: string
   }>(),
-  {
-    zoom: 13,
-  }
+  { zoom: 13 }
 )
 
+// =====================
+// COMPOSABLE
+// =====================
+const { resolveAddress } = useMap()
+
+// =====================
+// STATE
+// =====================
 const mapRef = ref<HTMLDivElement | null>(null)
 const status = ref<'idle' | 'loading' | 'ok' | 'error'>('idle')
-const errorMsg = ref('')
 
+const routingEnabled = ref(true)
+
+// SEARCH UI
+const searchOpen = ref(false)
+const searchValue = ref('')
+
+// =====================
+// LEAFLET STATE
+// =====================
 let map: L.Map | null = null
 let marker: L.Marker | null = null
 let routeLayer: L.GeoJSON | null = null
 let clickPoints: Coordinates[] = []
+let lastCenter: Coordinates | null = null
+let clickHandler: any = null
+let markers: L.Marker[] = []
 
-// 🔎 GEOCODING (LOCAL)
-async function geocode(address: string): Promise<Coordinates> {
-  const res = await fetch(`${API}/api/search?q=${encodeURIComponent(address)}`)
-  const data = await res.json()
+// =====================
+// MOVE MAP
+// =====================
+function moveTo(coords: Coordinates) {
+  if (!map) return
 
-  if (!data.length) throw new Error('No encontrado')
+  map.setView([coords.lat, coords.lng], props.zoom)
 
-  return {
-    lat: parseFloat(data[0].lat),
-    lng: parseFloat(data[0].lon),
+  if (marker) {
+    marker.setLatLng([coords.lat, coords.lng])
   }
 }
 
-// 🧭 RUTA
-async function drawRoute(from: Coordinates, to: Coordinates) {
-  const res = await fetch(
-    `${API}/api/route?from=${from.lng},${from.lat}&to=${to.lng},${to.lat}`
-  )
-
-  const data = await res.json()
-  const geo = data.routes?.[0]?.geometry
-
-  if (!geo) return
-
-  if (routeLayer) routeLayer.remove()
-
-  routeLayer = L.geoJSON(geo, {
-    style: {
-      color: '#2563eb',
-      weight: 4,
-    },
-  }).addTo(map!)
-
-  map!.fitBounds(routeLayer.getBounds())
+// =====================
+// CONTROLS
+// =====================
+function resetView() {
+  if (lastCenter && map) {
+    map.setView([lastCenter.lat, lastCenter.lng], props.zoom)
+  }
 }
 
-// 🗺️ MAPA
+function centerMarker() {
+  if (marker && map) {
+    map.setView(marker.getLatLng(), map.getZoom())
+  }
+}
+
+function clearRoute() {
+  routeLayer?.remove()
+  routeLayer = null
+  clickPoints = []
+}
+
+// =====================
+// ROUTE
+// =====================
+async function drawRoute(from: Coordinates, to: Coordinates) {
+  const route = await getRoute(from, to)
+  if (!route?.geometry) return
+
+  routeLayer?.remove()
+
+  routeLayer = L.geoJSON(route.geometry, {
+    style: { color: '#3b82f6', weight: 4 },
+  }).addTo(map!)
+
+  map!.fitBounds(routeLayer.getBounds(), { padding: [40, 40] })
+}
+
+// =====================
+// INIT MAP
+// =====================
 function initMap(coords: Coordinates) {
   if (!mapRef.value) return
 
@@ -89,92 +134,138 @@ function initMap(coords: Coordinates) {
     map = L.map(mapRef.value).setView([coords.lat, coords.lng], props.zoom)
 
     L.tileLayer(TILE, {
-      attribution: 'Cuba Offline Maps',
+      attribution: 'Map',
       maxZoom: 19,
     }).addTo(map)
 
-    // 🖱️ CLICK PARA RUTAS
-    map.on('click', async (e) => {
-      const c = { lat: e.latlng.lat, lng: e.latlng.lng }
+    clickHandler = async (e: L.LeafletMouseEvent) => {
+      if (!routingEnabled.value) return
+
+      const c: Coordinates = {
+        lat: e.latlng.lat,
+        lng: e.latlng.lng,
+      }
 
       clickPoints.push(c)
 
-      L.marker([c.lat, c.lng]).addTo(map!)
+      const m = L.marker([c.lat, c.lng]).addTo(map!)
+      markers.push(m)
 
       if (clickPoints.length === 2) {
         await drawRoute(clickPoints[0], clickPoints[1])
         clickPoints = []
       }
-    })
-  } else {
-    map.setView([coords.lat, coords.lng], props.zoom)
+    }
+
+    map.on('click', clickHandler)
   }
 
-  if (marker) {
-    marker.setLatLng([coords.lat, coords.lng])
-  } else {
-    marker = L.marker([coords.lat, coords.lng]).addTo(map!)
-  }
-
-  marker.bindPopup(props.label || props.address || 'Ubicación').openPopup()
+  lastCenter = coords
+  moveTo(coords)
 }
 
-// 🔄 LOAD
+// =====================
+// LOAD
+// =====================
 async function load() {
   status.value = 'loading'
-  errorMsg.value = ''
 
   try {
     let coords: Coordinates
 
-    if (props.coordinates) {
-      coords = props.coordinates
-    } else if (props.address) {
-      coords = await geocode(props.address)
-    } else {
-      throw new Error('Se requiere coordinates o address')
-    }
+    if (props.coordinates) coords = props.coordinates
+    else if (props.address) coords = await resolveAddress(props.address)
+    else coords = DEFAULT_COORDS
 
     initMap(coords)
     status.value = 'ok'
-  } catch (e: any) {
-    errorMsg.value = e.message
+  } catch {
     status.value = 'error'
   }
 }
 
+// =====================
+// SEARCH (lat,lng o address)
+// =====================
+async function handleSearch() {
+  const value = searchValue.value.trim()
+  if (!value) return
+
+  try {
+    if (value.includes(',')) {
+      const [lat, lng] = value.split(',').map(v => Number(v.trim()))
+      if (!isNaN(lat) && !isNaN(lng)) {
+        moveTo({ lat, lng })
+        searchOpen.value = false
+        return
+      }
+    }
+
+    const coords = await resolveAddress(value)
+    moveTo(coords)
+    searchOpen.value = false
+
+  } catch {
+    console.error('Search error')
+  }
+}
+
+// =====================
+// LIFECYCLE
+// =====================
 onMounted(load)
 
 onUnmounted(() => {
+  if (map && clickHandler) map.off('click', clickHandler)
+  markers.forEach(m => m.remove())
   map?.remove()
-  map = null
 })
 
-watch(() => [props.coordinates, props.address], load)
+watch(() => props.coordinates, val => {
+  if (val) moveTo(val)
+})
+
+watch(() => props.address, load)
 </script>
 
 <template>
   <div class="map-wrapper">
-    
-    <!-- Loading -->
-    <Transition name="fade">
-      <div v-if="status === 'loading'" class="map-overlay">
-        <div class="spinner" />
-        <span>Cargando mapa…</span>
-      </div>
-    </Transition>
 
-    <!-- Error -->
-    <Transition name="fade">
-      <div v-if="status === 'error'" class="map-overlay map-overlay--error">
-        <span>{{ errorMsg }}</span>
-        <button class="retry-btn" @click="load">Reintentar</button>
-      </div>
-    </Transition>
+    <!-- ===================== -->
+    <!-- SEARCH (ARRIBA IZQUIERDA) -->
+    <!-- ===================== -->
+    <div class="search-box">
+      <button class="search-btn" @click="searchOpen = !searchOpen">
+        🔍
+      </button>
 
-    <!-- MAP -->
+      <div v-if="searchOpen" class="search-panel">
+        <input
+          v-model="searchValue"
+          placeholder="Dirección o lat,lng"
+          @keyup.enter="handleSearch"
+        />
+        <button @click="handleSearch">Ir</button>
+      </div>
+    </div>
+
+    <!-- ===================== -->
+    <!-- CONTROLES (ABAJO DERECHA) -->
+    <!-- ===================== -->
+    <MapControls
+      v-model:routingEnabled="routingEnabled"
+      @center="centerMarker"
+      @reset="resetView"
+      @clear-route="clearRoute"
+    />
+
+    <!-- LOADING -->
+    <div v-if="status === 'loading'" class="overlay">
+      Cargando mapa...
+    </div>
+
+    <!-- MAPA -->
     <div ref="mapRef" class="leaflet-map" />
-
   </div>
 </template>
 
@@ -183,49 +274,68 @@ watch(() => [props.coordinates, props.address], load)
   position: relative;
   width: 100%;
   height: 100%;
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid #e2e8f0;
 }
 
+/* MAP */
 .leaflet-map {
   width: 100%;
   height: 100%;
 }
 
-.map-overlay {
+/* ===================== */
+/* SEARCH (TOP LEFT) */
+/* ===================== */
+.search-box {
   position: absolute;
-  inset: 0;
-  z-index: 1000;
+  top: 12px;
+  left: 12px;
+  z-index: 2000;
   display: flex;
   flex-direction: column;
+  gap: 6px;
+}
+
+.search-btn {
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 10px;
+  background: white;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+.search-panel {
+  display: flex;
+  gap: 6px;
+}
+
+.search-panel input {
+  width: 220px;
+  padding: 6px;
+  border-radius: 8px;
+  border: 1px solid #d11c1c;
+}
+
+.search-panel button {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* ===================== */
+/* OVERLAY */
+/* ===================== */
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0.6);
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  background: rgba(248, 250, 252, 0.9);
-}
-
-.map-overlay--error {
-  color: red;
-}
-
-.spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid #e2e8f0;
-  border-top-color: #3b82f6;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.retry-btn {
-  padding: 6px 16px;
-  border: 1px solid red;
-  background: transparent;
-  cursor: pointer;
+  z-index: 1500;
 }
 </style>
