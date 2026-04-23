@@ -2,7 +2,6 @@
 import { ref, computed } from 'vue'
 import PersonGraph from '../modules/graph/components/PersonGraph.vue'
 import MapView from '../modules/map/components/MapView.vue'
-import SearchControls from '../components/SearchControls.vue'
 import { persons, links } from '../data/mockData'
 
 const activeTab = ref<'graph' | 'map'>('graph')
@@ -64,33 +63,20 @@ const handleClear = () => {
             </nav>
         </header>
 
-    <main class="main">
-      <div v-if="activeTab === 'graph'" class="graph-view">
-        <SearchControls
-          v-model:search-term="searchTerm"
-          v-model:selected-filter="selectedFilter"
-          v-model:show-advanced="showAdvanced"
-          @search="handleSearch"
-          @clear="handleClear"
-        />
-        
-        <div class="results-info" v-if="searchTerm">
-          <span class="results-count">
-            {{ filteredPersons.length }} resultado{{ filteredPersons.length !== 1 ? 's' : '' }} encontrado{{ filteredPersons.length !== 1 ? 's' : '' }}
-          </span>
-          <span class="search-term">para "{{ searchTerm }}"</span>
-        </div>
-        
-        <PersonGraph 
-          :persons="filteredPersons" 
-          :links="links.filter(l => 
-            filteredPersons.some(p => p.id === l.source) && 
-            filteredPersons.some(p => p.id === l.target)
-          )" 
-        />
-      </div>
-      <MapView v-else />
-    </main>
+        <!-- MAIN -->
+        <main class="main">
+            <Transition name="fade" mode="out-in">
+
+                <section v-if="activeTab === 'graph'" key="graph" class="view">
+                    <PersonGraph :persons="persons" :links="links" />
+                </section>
+
+                <section v-else key="map" class="view">
+                    <MapView :coordinates="{ lat: 23.1136, lng: -82.3666 }" label="La Habana" />
+                </section>
+
+            </Transition>
+        </main>
 
     </div>
 </template>
