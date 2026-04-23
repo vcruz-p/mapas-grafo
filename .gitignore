@@ -1,4 +1,1 @@
-```
-# Build artifacts
-dist/
-```
+Nothing needs to be added to the .gitignore file based on the provided file changes, as only a Vue component file was modified and no build artifacts, dependencies, or temporary files were detected.

@@ -233,7 +233,7 @@ watch(() => props.address, load)
   <div class="map-wrapper">
 
     <!-- ===================== -->
-    <!-- SEARCH (ARRIBA IZQUIERDA) -->
+    <!-- SEARCH (ARRIBA DERECHA, ENCIMA DE LAYERS) -->
     <!-- ===================== -->
     <div class="search-container">
       <div class="search-box">
@@ -297,13 +297,13 @@ watch(() => props.address, load)
 }
 
 /* ===================== */
-/* SEARCH (TOP LEFT) */
+/* SEARCH (TOP RIGHT, ABOVE LAYERS) */
 /* ===================== */
 .search-container {
   position: absolute;
   top: 12px;
-  left: 12px;
-  z-index: 2000;
+  right: 12px;
+  z-index: 2001;
 }
 
 .search-box {
@@ -378,11 +378,11 @@ watch(() => props.address, load)
 }
 
 /* ===================== */
-/* LAYERS (TOP RIGHT) */
+/* LAYERS (TOP RIGHT, BELOW SEARCH) */
 /* ===================== */
 .layers-container {
   position: absolute;
-  top: 12px;
+  top: 70px;
   right: 12px;
   z-index: 2000;
 }
@@ -392,7 +392,7 @@ watch(() => props.address, load)
 /* ===================== */
 .controls-container {
   position: absolute;
-  top: 70px;
+  top: 130px;
   right: 12px;
   z-index: 2000;
 }
