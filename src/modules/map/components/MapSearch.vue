@@ -233,8 +233,8 @@ function handleBlur() {
 .map-search {
   position: absolute;
   top: 16px;
-  left: 16px;
-  z-index: 1000;
+  right: 16px;
+  z-index: 2001;
   width: min(360px, calc(100vw - 32px));
   font-family: var(--font-sans);
 }
