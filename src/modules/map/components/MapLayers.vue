@@ -75,6 +75,9 @@ function setupBaseLayers(map: maplibregl.Map) {
 // RADIO LAYERS
 // =====================
 function setupRadio(map: maplibregl.Map) {
+  // Verificar si ya existe para evitar duplicados
+  if (map.getSource('radio')) return
+
   map.addSource('radio', {
     type: 'vector',
     url: RADIO_PM,
@@ -104,6 +107,26 @@ function setupRadio(map: maplibregl.Map) {
   map.on('mouseleave', 'radio-towers', () => {
     map.getCanvas().style.cursor = ''
   })
+}
+
+// =====================
+// REMOVE RADIO LAYERS
+// =====================
+function removeRadio(map: maplibregl.Map) {
+  // Remover listeners primero
+  map.off('click', 'radio-towers')
+  map.off('mouseenter', 'radio-towers')
+  map.off('mouseleave', 'radio-towers')
+
+  // Remover layer si existe
+  if (map.getLayer('radio-towers')) {
+    map.removeLayer('radio-towers')
+  }
+
+  // Remover source si existe
+  if (map.getSource('radio')) {
+    map.removeSource('radio')
+  }
 }
 
 // =====================
@@ -152,11 +175,20 @@ function setSatellite(map: maplibregl.Map, enabled: boolean) {
 function setRadio(map: maplibregl.Map, enabled: boolean) {
   radioEnabled.value = enabled
 
-  map.setLayoutProperty(
-    'radio-towers',
-    'visibility',
-    enabled ? 'visible' : 'none'
-  )
+  if (enabled) {
+    // Si no existe el layer, lo creamos
+    if (!map.getLayer('radio-towers')) {
+      setupRadio(map)
+    }
+    map.setLayoutProperty(
+      'radio-towers',
+      'visibility',
+      'visible'
+    )
+  } else {
+    // Cuando se desactiva, removemos completamente los layers
+    removeRadio(map)
+  }
 
   emit('layer-change', 'radiobases')
 }
@@ -171,7 +203,7 @@ watch(
 
     onReady(map, () => {
       setupBaseLayers(map)
-      setupRadio(map)
+      // No inicializamos radio aquí, se carga solo cuando se activa
 
       // OFF por defecto
       setSatellite(map, false)
