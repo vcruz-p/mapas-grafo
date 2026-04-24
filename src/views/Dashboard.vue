@@ -35,7 +35,7 @@ const activeTab = ref<'graph' | 'map'>('graph')
                 </section>
 
                 <section v-else key="map" class="view">
-                    <MapView :coordinates="{ lat: 23.1136, lng: -82.3666 }" label="La Habana" />
+                    <MapView />
                 </section>
 
             </Transition>

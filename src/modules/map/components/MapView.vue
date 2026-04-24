@@ -157,7 +157,6 @@ function handleMapClick(e: maplibregl.MapMouseEvent) {
     lng: e.lngLat.lng,
   }
 
-  // 🔵 START / UPDATE START MARKER
   if (!startMarker) {
     startMarker = new maplibregl.Marker({ color: '#2563eb' })
       .setLngLat([coords.lng, coords.lat])
@@ -174,34 +173,46 @@ function handleMapClick(e: maplibregl.MapMouseEvent) {
 
   clickPoints.push(coords)
 
-  // Crear marcador para el punto actual
-  const marker = new maplibregl.Marker({ 
-    color: clickPoints.length === 1 ? '#ef4444' : '#22c55e' // Rojo para el primero, verde para los siguientes
-  })
+  const marker = new maplibregl.Marker()
     .setLngLat([coords.lng, coords.lat])
     .addTo(map)
-  
+
   markers.push(marker)
 
-  // Si hay más de un punto, dibujar ruta entre el anterior y el nuevo
+  updateMarkersColors()
+
   if (clickPoints.length >= 2) {
-    drawRoute(clickPoints[clickPoints.length - 2], coords)
-    
-    // Cambiar el marcador anterior a verde
-    if (markers.length >= 2) {
-      const prevMarker = markers[markers.length - 2]
-      const prevEl = document.createElement('div')
-      prevEl.style.width = '15px'
-      prevEl.style.height = '15px'
-      prevEl.style.borderRadius = '50%'
-      prevEl.style.backgroundColor = '#22c55e'
-      prevEl.style.border = '2px solid white'
-      prevEl.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)'
-      
-      prevMarker.getElement().innerHTML = ''
-      prevMarker.getElement().appendChild(prevEl)
-    }
+    drawRoute(
+      clickPoints[clickPoints.length - 2],
+      coords
+    )
   }
+}
+
+function updateMarkersColors() {
+  const total = markers.length
+  if (total === 0) return
+
+  markers.forEach((mk, idx) => {
+    let color = '#22c55e' // verde default
+
+    if (idx === 0) {
+      color = '#2563eb' // azul inicio
+    } else if (idx === total - 1) {
+      color = '#ef4444' // rojo final
+    }
+
+    const el = document.createElement('div')
+    el.style.width = '14px'
+    el.style.height = '14px'
+    el.style.borderRadius = '50%'
+    el.style.backgroundColor = color
+    el.style.border = '2px solid white'
+    el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)'
+
+    mk.getElement().innerHTML = ''
+    mk.getElement().appendChild(el)
+  })
 }
 
 // ===================== ROUTE =====================
