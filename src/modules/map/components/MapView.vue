@@ -49,6 +49,7 @@ let startMarker: maplibregl.Marker | null = null
 let endMarker: maplibregl.Marker | null = null
 
 let clickPoints: Coordinates[] = []
+let markers: maplibregl.Marker[] = []
 let lastCenter: Coordinates | null = null
 
 const routeId = 'route-layer'
@@ -76,7 +77,7 @@ function baseStyle() {
         source: 'osm',
       },
     ],
-  } as maplibregl.StyleSpecification
+  } as any
 }
 
 // ===================== MOVE =====================
@@ -173,9 +174,33 @@ function handleMapClick(e: maplibregl.MapMouseEvent) {
 
   clickPoints.push(coords)
 
-  if (clickPoints.length === 2) {
-    drawRoute(clickPoints[0], clickPoints[1])
-    clickPoints = []
+  // Crear marcador para el punto actual
+  const marker = new maplibregl.Marker({ 
+    color: clickPoints.length === 1 ? '#ef4444' : '#22c55e' // Rojo para el primero, verde para los siguientes
+  })
+    .setLngLat([coords.lng, coords.lat])
+    .addTo(map)
+  
+  markers.push(marker)
+
+  // Si hay más de un punto, dibujar ruta entre el anterior y el nuevo
+  if (clickPoints.length >= 2) {
+    drawRoute(clickPoints[clickPoints.length - 2], coords)
+    
+    // Cambiar el marcador anterior a verde
+    if (markers.length >= 2) {
+      const prevMarker = markers[markers.length - 2]
+      const prevEl = document.createElement('div')
+      prevEl.style.width = '15px'
+      prevEl.style.height = '15px'
+      prevEl.style.borderRadius = '50%'
+      prevEl.style.backgroundColor = '#22c55e'
+      prevEl.style.border = '2px solid white'
+      prevEl.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)'
+      
+      prevMarker.getElement().innerHTML = ''
+      prevMarker.getElement().appendChild(prevEl)
+    }
   }
 }
 
@@ -271,6 +296,10 @@ function clearRoute() {
     endMarker.remove()
     endMarker = null
   }
+
+  // Remover todos los marcadores de puntos
+  markers.forEach(m => m.remove())
+  markers = []
 
   clickPoints = []
 }
