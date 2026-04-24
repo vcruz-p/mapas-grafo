@@ -104,13 +104,20 @@ export async function health(): Promise<{ status: string }> {
 }
 
 export async function searchPlaces(query: string) {
+  const q = query?.trim()
+
+  if (!q) return []
+
   const res = await fetch(
-    `${API_BASE}/api/search?q=${encodeURIComponent(query)}`
+    `${API_BASE}/api/search?q=${encodeURIComponent(q)}`
   )
 
   if (!res.ok) {
-    throw new Error('Error en search')
+    throw new Error(`Error en search: ${res.status}`)
   }
 
-  return res.json()
+  const data = await res.json()
+
+  return Array.isArray(data) ? data : []
+
 }

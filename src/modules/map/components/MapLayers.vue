@@ -1,219 +1,276 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import L from 'leaflet'
+import maplibregl from 'maplibre-gl'
 
 const props = defineProps<{
-  map: L.Map | null
+  map: maplibregl.Map | null
 }>()
 
 const emit = defineEmits<{
   (e: 'layer-change', layerName: string): void
 }>()
 
-// Capas disponibles
-const baseLayers = ref([
-  { name: 'Calles', id: 'streets', icon: '🗺️' },
-  { name: 'Satélite', id: 'satellite', icon: '🛰️' },
-])
-
-const activeLayer = ref('streets')
+// =====================
+// STATE
+// =====================
 const isOpen = ref(false)
 
-// URLs de tiles para diferentes capas
-const tileLayers: Record<string, string> = {
-  streets: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-  satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+const satelliteEnabled = ref(false)
+const radioEnabled = ref(false)
+
+// =====================
+// SOURCES
+// =====================
+const TILE_PROXY =
+  'http://192.168.83.128:8085/tile/{z}/{x}/{y}.png'
+
+const SATELLITE =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+
+const RADIO_PM =
+  'pmtiles://http://192.168.83.128:8086/radio/cuba.pmtiles'
+
+// =====================
+// SAFE LOAD
+// =====================
+function onReady(map: maplibregl.Map, fn: () => void) {
+  if (map.isStyleLoaded()) fn()
+  else map.once('load', fn)
 }
 
-const attributions: Record<string, string> = {
-  streets: '© OpenStreetMap',
-  satellite: '© ESRI World Imagery',
-  terrain: '© OpenTopoMap',
-  dark: '© CartoDB',
-}
-
-let currentTileLayer: L.TileLayer | null = null
-
-function changeLayer(layerId: string) {
-  if (!props.map) return
-
-  activeLayer.value = layerId
-  isOpen.value = false
-
-  // Remover capa actual
-  if (currentTileLayer) {
-    props.map.removeLayer(currentTileLayer)
-  }
-
-  // Añadir nueva capa
-  const tileUrl = tileLayers[layerId]
-  const attribution = attributions[layerId]
-
-  currentTileLayer = L.tileLayer(tileUrl, {
-    attribution,
-    maxZoom: 19,
+// =====================
+// INIT BASE LAYERS (UNA SOLA VEZ)
+// =====================
+function setupBaseLayers(map: maplibregl.Map) {
+  // STREET
+  map.addSource('street', {
+    type: 'raster',
+    tiles: [TILE_PROXY],
+    tileSize: 256,
   })
 
-  currentTileLayer.addTo(props.map)
-  
-  emit('layer-change', layerId)
+  map.addLayer({
+    id: 'street-layer',
+    type: 'raster',
+    source: 'street',
+    layout: { visibility: 'visible' },
+  })
+
+  // SATELLITE
+  map.addSource('sat', {
+    type: 'raster',
+    tiles: [SATELLITE],
+    tileSize: 256,
+  })
+
+  map.addLayer({
+    id: 'sat-layer',
+    type: 'raster',
+    source: 'sat',
+    layout: { visibility: 'none' },
+  })
 }
 
-watch(() => props.map, (newMap) => {
-  if (newMap && !currentTileLayer) {
-    changeLayer('streets')
-  }
-}, { immediate: true })
+// =====================
+// RADIO LAYERS
+// =====================
+function setupRadio(map: maplibregl.Map) {
+  map.addSource('radio', {
+    type: 'vector',
+    url: RADIO_PM,
+  })
+
+  map.addLayer({
+    id: 'radio-towers',
+    type: 'symbol',
+    source: 'radio',
+    'source-layer': 'cells',
+    layout: {
+      'text-field': '📡',
+      'text-size': 18,
+      'text-allow-overlap': true,
+    },
+    paint: {
+      'text-color': '#f97316',
+    },
+  })
+
+  map.on('click', 'radio-towers', (e) => createPopup(map, e))
+
+  map.on('mouseenter', 'radio-towers', () => {
+    map.getCanvas().style.cursor = 'pointer'
+  })
+
+  map.on('mouseleave', 'radio-towers', () => {
+    map.getCanvas().style.cursor = ''
+  })
+}
+
+// =====================
+// POPUP ROBUSTO
+// =====================
+function createPopup(map: maplibregl.Map, e: any) {
+  const feature = e.features?.[0]
+  if (!feature) return
+
+  const p = feature.properties ?? {}
+
+  const cellId = p.cell_id ?? p.cellid ?? p.id ?? 'N/A'
+  const name = p.cell_name ?? p.name ?? 'N/A'
+  const tech = p.tech ?? p.technology ?? 'N/A'
+  const azimuth = p.azimuth ?? p.azi ?? 'N/A'
+
+  new maplibregl.Popup()
+    .setLngLat(e.lngLat)
+    .setHTML(`
+      <div style="font-size:12px; line-height:1.4">
+        <b>📡 Torre Celular</b><br/>
+        <b>ID:</b> ${cellId}<br/>
+        <b>Nombre:</b> ${name}<br/>
+        <b>Tecnología:</b> ${tech}<br/>
+        <b>Azimuth:</b> ${azimuth}°
+      </div>
+    `)
+    .addTo(map)
+}
+
+// =====================
+// TOGGLES (SOLO VISIBILITY)
+// =====================
+function setSatellite(map: maplibregl.Map, enabled: boolean) {
+  satelliteEnabled.value = enabled
+
+  map.setLayoutProperty(
+    'sat-layer',
+    'visibility',
+    enabled ? 'visible' : 'none'
+  )
+
+  emit('layer-change', 'satellite')
+}
+
+function setRadio(map: maplibregl.Map, enabled: boolean) {
+  radioEnabled.value = enabled
+
+  map.setLayoutProperty(
+    'radio-towers',
+    'visibility',
+    enabled ? 'visible' : 'none'
+  )
+
+  emit('layer-change', 'radiobases')
+}
+
+// =====================
+// INIT
+// =====================
+watch(
+  () => props.map,
+  (map) => {
+    if (!map) return
+
+    onReady(map, () => {
+      setupBaseLayers(map)
+      setupRadio(map)
+
+      // OFF por defecto
+      setSatellite(map, false)
+      setRadio(map, false)
+    })
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
   <div class="layer-control">
-    <button 
-      class="layer-toggle" 
-      @click="isOpen = !isOpen"
-      :class="{ active: isOpen }"
-    >
-      📚
+
+    <button class="layer-toggle" @click="isOpen = !isOpen">
+      🗺️
     </button>
 
-    <Transition name="slide">
-      <div v-if="isOpen" class="layer-panel">
-        <div class="layer-header">
-          <h4>Capas del mapa</h4>
-        </div>
-        
-        <div class="layer-list">
-          <button
-            v-for="layer in baseLayers"
-            :key="layer.id"
-            class="layer-item"
-            :class="{ active: activeLayer === layer.id }"
-            @click="changeLayer(layer.id)"
-          >
-            <span class="layer-icon">{{ layer.icon }}</span>
-            <span class="layer-name">{{ layer.name }}</span>
-            <span v-if="activeLayer === layer.id" class="check-mark">✓</span>
-          </button>
-        </div>
-      </div>
-    </Transition>
+    <div v-if="isOpen" class="panel">
+
+      <div class="panel-header">Capas</div>
+
+      <!-- SATÉLITE -->
+      <button
+        class="layer-item"
+        @click="props.map && setSatellite(props.map, !satelliteEnabled)"
+      >
+        🛰️ Satélite
+        <span class="hint">
+          {{ satelliteEnabled ? 'ON' : 'OFF' }}
+        </span>
+      </button>
+
+      <!-- RADIO -->
+      <button
+        class="layer-item"
+        @click="props.map && setRadio(props.map, !radioEnabled)"
+      >
+        📡 Radiobases
+        <span class="hint">
+          {{ radioEnabled ? 'ON' : 'OFF' }}
+        </span>
+      </button>
+
+    </div>
   </div>
 </template>
 
 <style scoped>
 .layer-control {
-  /* No absolute positioning - flows in flex container */
+  position: relative;
+  font-family: system-ui;
 }
 
 .layer-toggle {
-  width: 42px;
-  height: 42px;
-  border: none;
+  width: 44px;
+  height: 44px;
   border-radius: 10px;
+  border: none;
   background: white;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  font-size: 20px;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+  font-size: 18px;
 }
 
-.layer-toggle:hover {
-  background: #f1f5f9;
-  transform: scale(1.05);
-}
-
-.layer-toggle.active {
-  background: #3b82f6;
-  color: white;
-}
-
-.layer-panel {
+.panel {
   position: absolute;
-  top: 52px;
+  top: 50px;
   right: 0;
+  width: 240px;
   background: white;
   border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-  min-width: 180px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.25);
   overflow: hidden;
-  border: 1px solid #e2e8f0;
-  z-index: 2001;
 }
 
-.layer-header {
-  padding: 12px 16px;
-  border-bottom: 1px solid #e2e8f0;
+.panel-header {
+  padding: 10px;
+  font-weight: 600;
+  border-bottom: 1px solid #eee;
   background: #f8fafc;
 }
 
-.layer-header h4 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #1e293b;
-}
-
-.layer-list {
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
 .layer-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border: none;
-  background: transparent;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-align: left;
   width: 100%;
+  padding: 12px;
+  border: none;
+  background: white;
+  text-align: left;
+  cursor: pointer;
+  transition: 0.2s;
 }
 
 .layer-item:hover {
   background: #f1f5f9;
 }
 
-.layer-item.active {
-  background: #eff6ff;
-  color: #1d4ed8;
-  font-weight: 500;
-}
-
-.layer-icon {
-  font-size: 18px;
-}
-
-.layer-name {
-  flex: 1;
-  font-size: 13px;
-}
-
-.check-mark {
-  color: #10b981;
-  font-weight: bold;
-}
-
-/* Transiciones */
-.slide-enter-active,
-.slide-leave-active {
-  transition: all 0.2s ease;
-}
-
-.slide-enter-from {
-  opacity: 0;
-  transform: translateY(-10px) scale(0.95);
-}
-
-.slide-leave-to {
-  opacity: 0;
-  transform: translateY(-10px) scale(0.95);
+.hint {
+  float: right;
+  font-size: 12px;
+  color: #64748b;
 }
 </style>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-defineProps<{
+const props = defineProps<{
   routingEnabled: boolean
+  radioEnabled: boolean
 }>()
 
 const emit = defineEmits<{
@@ -9,31 +10,63 @@ const emit = defineEmits<{
   (e: 'center'): void
   (e: 'reset'): void
   (e: 'clear-route'): void
-  (e: 'update:routingEnabled', value: boolean): void
+  (e: 'update:routingEnabled', v: boolean): void
+  (e: 'update:radioEnabled', v: boolean): void
 }>()
+
+function toggleRouting() {
+  emit('update:routingEnabled', !props.routingEnabled)
+}
+
+function toggleRadio() {
+  emit('update:radioEnabled', !props.radioEnabled)
+}
 </script>
 
 <template>
   <div class="map-controls">
 
-    <button @click="emit('center')" class="control-btn" aria-label="Centrar marcador">
-      📍
-    </button>
-    <button @click="emit('reset')" class="control-btn" aria-label="Resetear vista">
-      ⟲
-    </button>
-    <button @click="emit('clear-route')" class="control-btn" aria-label="Limpiar ruta">
-      🧹
+    <!-- ZOOM -->
+    <button class="control-btn" @click="emit('zoom-in')">
+      <i class="bi bi-plus-lg"></i>
     </button>
 
-    <label class="toggle-control" aria-label="Activar rutas">
-      <input
-        type="checkbox"
-        :checked="routingEnabled"
-        @change="emit('update:routingEnabled', ($event.target as HTMLInputElement).checked)"
-      />
-      <span class="toggle-text">Rutas</span>
-    </label>
+    <button class="control-btn" @click="emit('zoom-out')">
+      <i class="bi bi-dash-lg"></i>
+    </button>
+
+    <!-- CENTER -->
+    <button class="control-btn" @click="emit('center')">
+      <i class="bi bi-crosshair"></i>
+    </button>
+
+    <!-- RESET -->
+    <button class="control-btn" @click="emit('reset')">
+      <i class="bi bi-arrow-counterclockwise"></i>
+    </button>
+
+    <!-- CLEAR ROUTE -->
+    <button class="control-btn" @click="emit('clear-route')">
+      <i class="bi bi-trash3"></i>
+    </button>
+
+    <!-- ROUTING TOGGLE -->
+    <button
+      class="control-btn toggle"
+      :class="{ active: routingEnabled }"
+      @click="toggleRouting"
+    >
+      <i class="bi bi-sign-turn-right"></i>
+    </button>
+
+    <!-- RADIO TOGGLE -->
+    <button
+      class="control-btn toggle"
+      :class="{ active: radioEnabled }"
+      @click="toggleRadio"
+    >
+      <i class="bi bi-broadcast"></i>
+    </button>
 
   </div>
 </template>
@@ -45,6 +78,7 @@ const emit = defineEmits<{
   gap: 8px;
 }
 
+/* botones base */
 .control-btn {
   width: 42px;
   height: 42px;
@@ -53,46 +87,21 @@ const emit = defineEmits<{
   border-radius: 10px;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  font-size: 20px;
-  transition: all 0.2s ease;
+
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 16px;
 }
 
+/* toggles activos */
+.control-btn.toggle.active {
+  background: #2563eb;
+  color: white;
+}
+
+/* hover opcional */
 .control-btn:hover {
   background: #f1f5f9;
-  transform: scale(1.05);
-}
-
-.toggle-control {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 12px;
-  background: white;
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  min-height: 42px;
-}
-
-.toggle-control:hover {
-  background: #f1f5f9;
-}
-
-.toggle-control input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  accent-color: #3b82f6;
-}
-
-.toggle-text {
-  font-size: 13px;
-  font-weight: 500;
-  color: #1f2937;
 }
 </style>

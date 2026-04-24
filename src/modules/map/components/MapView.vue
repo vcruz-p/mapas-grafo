@@ -1,11 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
-
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
-import markerIcon from 'leaflet/dist/images/marker-icon.png'
-import markerShadow from 'leaflet/dist/images/marker-shadow.png'
+import { ref, onMounted, onUnmounted } from 'vue'
+import maplibregl from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
 
 import type { Coordinates } from '../types/map.types'
 import { useMap } from '../composables/useMap'
@@ -15,236 +11,254 @@ import MapControls from './MapControls.vue'
 import MapLayers from './MapLayers.vue'
 import MapSearch from './MapSearch.vue'
 
-// =====================
-// LEAFLET ICON FIX
-// =====================
-delete (L.Icon.Default.prototype as any)._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
-})
-
-// =====================
-// TILE SERVER
-// =====================
+// ===================== CONFIG =====================
 const TILE =
   import.meta.env.VITE_TILE_URL ||
-  'http://192.168.83.128:8081/tile/{z}/{x}/{y}.png'
+  'http://192.168.83.128:8085/tile/{z}/{x}/{y}.png'
 
 const DEFAULT_COORDS: Coordinates = {
   lat: 23.1136,
   lng: -82.3666,
 }
 
-// =====================
+// ===================== PROPS =====================
 const props = withDefaults(
   defineProps<{
     coordinates?: Coordinates
     address?: string
     zoom?: number
-    label?: string
   }>(),
   { zoom: 13 }
 )
 
-// =====================
-// COMPOSABLE
-// =====================
 const { resolveAddress } = useMap()
 
-// =====================
-// STATE
-// =====================
+// ===================== STATE =====================
 const mapRef = ref<HTMLDivElement | null>(null)
-const status = ref<'idle' | 'loading' | 'ok' | 'error'>('idle')
 
-const routingEnabled = ref(true)
+const routingEnabled = ref(false)
+const radioEnabled = ref(false)
 
-// =====================
-// LEAFLET STATE
-// =====================
-let map: L.Map | null = null
-let marker: L.Marker | null = null
-let routeLayer: L.GeoJSON | null = null
-let clickPoints: Coordinates[] = []
-let lastCenter: Coordinates | null = null
-let clickHandler: any = null
-let markers: L.Marker[] = []
+// ===================== MAP STATE =====================
+let map: maplibregl.Map | null = null
 
-// =====================
-// MOVE MAP
-// =====================
+let start: Coordinates | null = null
+let end: Coordinates | null = null
+
+let startMarker: maplibregl.Marker | null = null
+let endMarker: maplibregl.Marker | null = null
+
+const routeId = 'route-layer'
+
+// ===================== SAFE CHECK =====================
+function isValid(c: Coordinates | null): c is Coordinates {
+  return !!c && typeof c.lng === 'number' && typeof c.lat === 'number'
+}
+
+// ===================== STYLE =====================
+function baseStyle() {
+  return {
+    version: 8,
+    sources: {
+      osm: {
+        type: 'raster',
+        tiles: [TILE],
+        tileSize: 256,
+      },
+    },
+    layers: [
+      {
+        id: 'osm',
+        type: 'raster',
+        source: 'osm',
+      },
+    ],
+  } as maplibregl.StyleSpecification
+}
+
+// ===================== MOVE MAP =====================
 function moveTo(coords: Coordinates) {
   if (!map) return
 
-  map.setView([coords.lat, coords.lng], props.zoom)
+  map.flyTo({
+    center: [coords.lng, coords.lat],
+    zoom: props.zoom,
+  })
+}
 
-  if (marker) {
-    marker.setLatLng([coords.lat, coords.lng])
+// ===================== START MARKER =====================
+function setStart(coords: Coordinates) {
+  start = coords
+
+  if (!startMarker) {
+    startMarker = new maplibregl.Marker({ color: '#2563eb' })
+      .setLngLat([coords.lng, coords.lat])
+      .addTo(map!)
+  } else {
+    startMarker.setLngLat([coords.lng, coords.lat])
   }
 }
 
-// =====================
-// CONTROLS
-// =====================
-function resetView() {
-  if (lastCenter && map) {
-    map.setView([lastCenter.lat, lastCenter.lng], props.zoom)
+// ===================== END MARKER =====================
+function setEnd(coords: Coordinates) {
+  end = coords
+
+  if (!endMarker) {
+    endMarker = new maplibregl.Marker({
+      element: createFinishMarker(),
+      anchor: 'bottom',
+    }).addTo(map!)
+  }
+
+  endMarker.setLngLat([coords.lng, coords.lat])
+}
+
+// ===================== CLICK LOGIC =====================
+async function handleMapClick(e: maplibregl.MapMouseEvent) {
+  if (!map) return
+
+  const coords: Coordinates = {
+    lat: e.lngLat.lat,
+    lng: e.lngLat.lng,
+  }
+
+  // 1️⃣ FIRST CLICK → START
+  if (!start) {
+    setStart(coords)
+    return
+  }
+
+  // 2️⃣ SECOND CLICK → END
+  if (!end) {
+    setEnd(coords)
+
+    if (isValid(start) && isValid(end)) {
+      await drawRoute(start, end)
+    }
+
+    return
+  }
+
+  // 3️⃣ NEXT CLICKS → MOVE DESTINATION
+  setEnd(coords)
+
+  if (isValid(start) && isValid(end)) {
+    await drawRoute(start, end)
   }
 }
 
-function centerMarker() {
-  if (marker && map) {
-    map.setView(marker.getLatLng(), map.getZoom())
-  }
-}
-
-function clearRoute() {
-  routeLayer?.remove()
-  routeLayer = null
-  clickPoints = []
-}
-
-// =====================
-// ROUTE
-// =====================
+// ===================== ROUTE =====================
 async function drawRoute(from: Coordinates, to: Coordinates) {
+  if (!map) return
+
   const route = await getRoute(from, to)
-  if (!route?.geometry) return
+  if (!route?.geometry?.coordinates?.length) return
 
-  routeLayer?.remove()
+  if (map.getLayer(routeId)) map.removeLayer(routeId)
+  if (map.getSource(routeId)) map.removeSource(routeId)
 
-  routeLayer = L.geoJSON(route.geometry, {
-    style: { color: '#3b82f6', weight: 4 },
-  }).addTo(map!)
+  map.addSource(routeId, {
+    type: 'geojson',
+    data: route.geometry,
+  })
 
-  map!.fitBounds(routeLayer.getBounds(), { padding: [40, 40] })
+  map.addLayer({
+    id: routeId,
+    type: 'line',
+    source: routeId,
+    paint: {
+      'line-color': '#3b82f6',
+      'line-width': 4,
+    },
+  })
 }
 
-// =====================
-// INIT MAP
-// =====================
+// ===================== 🏁 FINISH MARKER =====================
+function createFinishMarker() {
+  const el = document.createElement('div')
+  el.innerHTML = '🏁'
+  el.style.fontSize = '22px'
+  el.style.filter = 'drop-shadow(0 2px 2px rgba(0,0,0,0.4))'
+  return el
+}
+
+// ===================== INIT =====================
 function initMap(coords: Coordinates) {
   if (!mapRef.value) return
 
   if (!map) {
-    map = L.map(mapRef.value).setView([coords.lat, coords.lng], props.zoom)
+    map = new maplibregl.Map({
+      container: mapRef.value,
+      style: baseStyle(),
+      center: [coords.lng, coords.lat],
+      zoom: props.zoom,
+    })
 
-    L.tileLayer(TILE, {
-      attribution: 'Map',
-      maxZoom: 19,
-    }).addTo(map)
-
-    clickHandler = async (e: L.LeafletMouseEvent) => {
-      if (!routingEnabled.value) return
-
-      const c: Coordinates = {
-        lat: e.latlng.lat,
-        lng: e.latlng.lng,
-      }
-
-      clickPoints.push(c)
-
-      const m = L.marker([c.lat, c.lng]).addTo(map!)
-      markers.push(m)
-
-      if (clickPoints.length === 2) {
-        await drawRoute(clickPoints[0], clickPoints[1])
-        clickPoints = []
-      }
-    }
-
-    map.on('click', clickHandler)
+    map.on('click', handleMapClick)
   }
 
-  lastCenter = coords
   moveTo(coords)
 }
 
-// =====================
-// LOAD
-// =====================
+// ===================== CONTROLS =====================
+function zoomIn() { map?.zoomIn() }
+function zoomOut() { map?.zoomOut() }
+
+function clearRoute() {
+  if (!map) return
+
+  if (map.getLayer(routeId)) map.removeLayer(routeId)
+  if (map.getSource(routeId)) map.removeSource(routeId)
+
+  start = null
+  end = null
+
+  startMarker?.remove()
+  endMarker?.remove()
+
+  startMarker = null
+  endMarker = null
+}
+
+// ===================== LOAD =====================
 async function load() {
-  status.value = 'loading'
+  let coords: Coordinates
 
-  try {
-    let coords: Coordinates
+  if (props.coordinates) coords = props.coordinates
+  else if (props.address) coords = await resolveAddress(props.address)
+  else coords = DEFAULT_COORDS
 
-    if (props.coordinates) coords = props.coordinates
-    else if (props.address) coords = await resolveAddress(props.address)
-    else coords = DEFAULT_COORDS
-
-    initMap(coords)
-    status.value = 'ok'
-  } catch {
-    status.value = 'error'
-  }
+  initMap(coords)
 }
 
-// =====================
-// HANDLE SELECT FROM MAPSEARCH
-// =====================
-function handleSelect(coords: { lat: number; lng: number; label: string }) {
-  moveTo(coords)
-}
-
-// =====================
-// LIFECYCLE
-// =====================
+// ===================== LIFECYCLE =====================
 onMounted(load)
 
 onUnmounted(() => {
-  if (map && clickHandler) map.off('click', clickHandler)
-  markers.forEach(m => m.remove())
   map?.remove()
 })
-
-watch(() => props.coordinates, val => {
-  if (val) moveTo(val)
-})
-
-watch(() => props.address, load)
 </script>
 
 <template>
   <div class="map-wrapper">
 
-    <!-- ===================== -->
-    <!-- CONTROLS VERTICAL (RIGHT SIDE) -->
-    <!-- ===================== -->
+    <div class="search-float">
+      <MapSearch @select="moveTo" />
+    </div>
+
     <div class="controls-vertical">
-      
-      <!-- SEARCH (TOP) -->
-      <MapSearch 
-        @select="handleSelect"
-        class="search-component"
+      <MapLayers :map="map" />
+
+      <MapControls
+        v-model:routingEnabled="routingEnabled"
+        v-model:radioEnabled="radioEnabled"
+        @zoom-in="zoomIn"
+        @zoom-out="zoomOut"
+        @clear-route="clearRoute"
       />
-
-      <!-- LAYERS (BELOW SEARCH) -->
-      <div class="layers-container">
-        <MapLayers :map="map" @layer-change="console.log('Capa cambiada:', $event)" />
-      </div>
-
-      <!-- CONTROLS (BELOW LAYERS) -->
-      <div class="controls-container">
-        <MapControls
-          v-model:routingEnabled="routingEnabled"
-          @center="centerMarker"
-          @reset="resetView"
-          @clear-route="clearRoute"
-        />
-      </div>
-
     </div>
 
-    <!-- LOADING -->
-    <div v-if="status === 'loading'" class="overlay">
-      Cargando mapa...
-    </div>
-
-    <!-- MAPA -->
-    <div ref="mapRef" class="leaflet-map" />
+    <div ref="mapRef" class="maplibre-map" />
   </div>
 </template>
 
@@ -255,15 +269,18 @@ watch(() => props.address, load)
   height: 100%;
 }
 
-/* MAP */
-.leaflet-map {
+.maplibre-map {
   width: 100%;
   height: 100%;
 }
 
-/* ===================== */
-/* CONTROLS VERTICAL (RIGHT SIDE) */
-/* ===================== */
+.search-float {
+  position: absolute;
+  top: 12px;
+  right: 70px;
+  z-index: 3000;
+}
+
 .controls-vertical {
   position: absolute;
   top: 12px;
@@ -272,33 +289,5 @@ watch(() => props.address, load)
   display: flex;
   flex-direction: column;
   gap: 8px;
-}
-
-/* SEARCH COMPONENT */
-.search-component {
-  /* Search has its own internal positioning */
-}
-
-/* LAYERS */
-.layers-container {
-  /* No absolute positioning - flows in flex container */
-}
-
-/* CONTROLS */
-.controls-container {
-  /* No absolute positioning - flows in flex container */
-}
-
-/* ===================== */
-/* OVERLAY */
-/* ===================== */
-.overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(255,255,255,0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1500;
 }
 </style>
